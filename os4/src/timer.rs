@@ -24,5 +24,5 @@ pub fn set_next_trigger() {
 }
 
 pub fn get_runtime(start_time: usize) -> usize {
-    (get_time()-start_time) / (CLOCK_FREQ / MILE_PER_SEC)
+    (get_time_us()-start_time) / (MICRO_PER_SEC / MILE_PER_SEC)
 }

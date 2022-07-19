@@ -23,7 +23,7 @@ pub use switch::__switch;
 pub use task::{TaskControlBlock, TaskStatus};
 pub use crate::mm::*;
 use crate::syscall::TaskInfo;
-use crate::timer::{get_runtime, get_time};
+use crate::timer::{get_runtime, get_time_us};
 
 pub use context::TaskContext;
 
@@ -83,7 +83,7 @@ impl TaskManager {
         let next_task = &mut inner.tasks[0];
         next_task.task_status = TaskStatus::Running;
         match next_task.start_time {
-            None => next_task.start_time = Some(get_time()),
+            None => next_task.start_time = Some(get_time_us()),
             _ => (),
         };
         let next_task_cx_ptr = &next_task.task_cx as *const TaskContext;
@@ -143,7 +143,7 @@ impl TaskManager {
             inner.tasks[next].task_status = TaskStatus::Running;
             inner.current_task = next;
             match inner.tasks[next].start_time {
-                None => inner.tasks[next].start_time = Some(get_time()),
+                None => inner.tasks[next].start_time = Some(get_time_us()),
                 _ => (),
             };
             let current_task_cx_ptr = &mut inner.tasks[current].task_cx as *mut TaskContext;
