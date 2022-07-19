@@ -22,6 +22,8 @@ use lazy_static::*;
 pub use switch::__switch;
 pub use task::{TaskControlBlock, TaskStatus};
 pub use crate::mm::*;
+use crate::syscall::TaskInfo;
+use crate::timer::{get_runtime, get_time};
 
 pub use context::TaskContext;
 
@@ -80,6 +82,10 @@ impl TaskManager {
         let mut inner = self.inner.exclusive_access();
         let next_task = &mut inner.tasks[0];
         next_task.task_status = TaskStatus::Running;
+        match next_task.start_time {
+            None => next_task.start_time = Some(get_time()),
+            _ => (),
+        };
         let next_task_cx_ptr = &next_task.task_cx as *const TaskContext;
         drop(inner);
         let mut _unused = TaskContext::zero_init();
@@ -136,6 +142,10 @@ impl TaskManager {
             let current = inner.current_task;
             inner.tasks[next].task_status = TaskStatus::Running;
             inner.current_task = next;
+            match inner.tasks[next].start_time {
+                None => inner.tasks[next].start_time = Some(get_time()),
+                _ => (),
+            };
             let current_task_cx_ptr = &mut inner.tasks[current].task_cx as *mut TaskContext;
             let next_task_cx_ptr = &inner.tasks[next].task_cx as *const TaskContext;
             drop(inner);
@@ -167,6 +177,38 @@ impl TaskManager {
         let current_task = inner.current_task;
         let memory_set: &mut MemorySet = &mut (inner.tasks[current_task].memory_set);
         memory_set.insert_framed_area(start_va, end_va, map_perm);
+    }
+
+    fn update_syscall_time(&self, syscall_id: usize) {
+        let mut inner = self.inner.exclusive_access();
+        let current_task = inner.current_task;
+        inner.tasks[current_task].syscall_times[syscall_id] += 1;
+    }
+
+    fn get_sys_task_info(&self, ti: *mut TaskInfo){
+        let mut inner = self.inner.exclusive_access();
+        let current_task = inner.current_task;
+        unsafe {
+            *ti = TaskInfo {
+                status: TaskStatus::Running,
+                syscall_times: inner.tasks[current_task].syscall_times.clone(),
+                time: match inner.tasks[current_task].start_time {
+                    Some(start_time) => get_runtime(start_time),
+                    _ => 0,
+                },
+            }
+        };
+
+    }
+
+    fn get_pa(&self, ptr: usize) -> usize{
+        let va = VirtAddr::from(ptr);
+        let inner = self.inner.exclusive_access();
+        let memory_set = &inner.tasks[inner.current_task].memory_set;
+        let pa: PhysAddr = memory_set.find_pte(va.floor()).unwrap().ppn().into();
+        let pa: usize = pa.into();
+        let result: usize = va.page_offset() + pa;
+        result
     }
 }
 
@@ -213,6 +255,8 @@ pub fn current_trap_cx() -> &'static mut TrapContext {
     TASK_MANAGER.get_current_trap_cx()
 }
 
+
+
 pub fn find_pte(vpn: VirtPageNum) -> Option<PageTableEntry> {
     TASK_MANAGER.find_pte(vpn)
 }
@@ -223,4 +267,16 @@ pub fn unmap(vpn_range: VPNRange) {
 
 pub fn insert_framed_area(start_va: VirtAddr,end_va: VirtAddr,map_perm: MapPermission) {
     TASK_MANAGER.insert_framed_area(start_va, end_va, map_perm);
+}
+
+pub fn update_syscall_time(syscall_id: usize) {
+    TASK_MANAGER.update_syscall_time(syscall_id);
+}
+
+pub fn get_sys_task_info(ti: *mut TaskInfo){
+    TASK_MANAGER.get_sys_task_info(ti);
+}
+
+pub fn get_pa(ptr: usize) -> usize{
+    TASK_MANAGER.get_pa(ptr)
 }
