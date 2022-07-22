@@ -1,7 +1,7 @@
 //! Process management syscalls
 
 use crate::config::MAX_SYSCALL_NUM;
-use crate::task::{exit_current_and_run_next, suspend_current_and_run_next, TaskStatus, find_pte, unmap, insert_framed_area};
+use crate::task::{exit_current_and_run_next, suspend_current_and_run_next, TaskStatus, find_pte, unmap, insert_framed_area, get_sys_task_info, get_pa};
 use crate::timer::get_time_us;
 use crate::mm::{VirtAddr, MapPermission, VPNRange};
 
@@ -34,12 +34,13 @@ pub fn sys_yield() -> isize {
 // YOUR JOB: 引入虚地址后重写 sys_get_time
 pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
     let _us = get_time_us();
-    // unsafe {
-    //     *ts = TimeVal {
-    //         sec: us / 1_000_000,
-    //         usec: us % 1_000_000,
-    //     };
-    // }
+    let _ts = get_pa(_ts as usize) as *mut TimeVal;
+     unsafe {
+         *_ts = TimeVal {
+             sec: _us / 1_000_000,
+             usec: _us % 1_000_000,
+         };
+     }
     0
 }
 
@@ -70,18 +71,18 @@ pub fn sys_mmap(_start: usize, _len: usize, _port: usize) -> isize {
     let end_va = VirtAddr::from(_start+_len);
     // check valid
     if !start_va.aligned() {
-        info!("va aligned fail!");
+        println!("va aligned fail!");
         return -1;
     }
     if (_port & !0x7 != 0) || (_port & 0x7 == 0) {
-        info!("port invalid");
+        println!("port invalid");
         return -1;
     }
     let vpn_range = VPNRange::new(start_va.floor(), end_va.ceil());
     // check if mapped
     for vpn in vpn_range {
         if let Some(_) = find_pte(vpn) {
-            info!("already exist mapped page!");
+            println!("already exist mapped page!");
             return -1;
         }
     }
@@ -97,7 +98,7 @@ pub fn sys_mmap(_start: usize, _len: usize, _port: usize) -> isize {
     for vpn in vpn_range {
         match find_pte(vpn) {
             None => {
-                info!("sys_mmap fail!");
+                println!("sys_mmap fail!");
                 return -1;
             },
             _ => (),
@@ -121,7 +122,7 @@ pub fn sys_munmap(_start: usize, _len: usize) -> isize {
     let end_va = VirtAddr::from(_start+_len);
     // check valid
     if !start_va.aligned() {
-        info!("va aligned fail!");
+        println!("va aligned fail!");
         return -1;
     }
     let vpn_range = VPNRange::new(start_va.floor(), end_va.ceil());
@@ -129,11 +130,11 @@ pub fn sys_munmap(_start: usize, _len: usize) -> isize {
     for vpn in vpn_range {
         match find_pte(vpn) {
             None => {
-                info!("exist unmapped page!");
+                println!("exist unmapped page!");
                 return -1;
             },
             _ => (),
-        }
+        };
     }
     // unmap
     unmap(vpn_range);
@@ -142,5 +143,7 @@ pub fn sys_munmap(_start: usize, _len: usize) -> isize {
 
 // YOUR JOB: 引入虚地址后重写 sys_task_info
 pub fn sys_task_info(ti: *mut TaskInfo) -> isize {
-    -1
+    let ti = get_pa(ti as usize) as *mut TaskInfo;
+    get_sys_task_info(ti);
+    0
 }

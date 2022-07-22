@@ -83,7 +83,7 @@ impl MemorySet {
     /// unmap by vpnrange
     pub fn unmap(&mut self, vpn_range: VPNRange) {
         for map_area in self.areas.iter_mut() {
-            if map_area.vpn_range.l <= vpn_range.r && map_area.vpn_range.r >= vpn_range.l {
+            if map_area.vpn_range.l < vpn_range.r && map_area.vpn_range.r > vpn_range.l {
                 for vpn in map_area.vpn_range {
                     map_area.unmap_one(&mut self.page_table, vpn);
                 }

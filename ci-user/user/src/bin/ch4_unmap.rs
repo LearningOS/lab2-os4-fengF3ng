@@ -24,6 +24,7 @@ fn main() -> i32 {
         unsafe {
             *addr = i as u8;
         }
+        //println!("TEST 04_5 {}", i);
     }
     for i in (start - len)..(start + len * 3) {
         let addr: *mut u8 = i as *mut u8;
