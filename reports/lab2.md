@@ -1,3 +1,7 @@
+# 实现的功能
+
+实验二主要实现了mmap和munmap两个功能。对于mmap而言，我们需要在当前进程的memory_set上申请新的map_area并将映射同时写入page_table。在实现的过程中通过memory_set的insert_frame完成该功能。对于munmap而言，主要判断移除页是否合法与移除页所处maparea即可。
+
 # 1
 
 标志位表明了当前页表项的状态，各个位具体描述的内容不一样。
